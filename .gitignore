@@ -1,0 +1,5 @@
+node_modules/
+.expo/
+myApp/
+.DS_Store
+*.log
