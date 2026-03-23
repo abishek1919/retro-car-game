@@ -45,16 +45,107 @@ const OBS_CONFIGS = [
   { type: OBS_CONE,   wFrac: 0.04, hFrac: 0.035, label: "cone" },
 ];
 
-// Colors
-const SKY_TOP      = "#0b0e2a";
-const SKY_BOTTOM   = "#1a1040";
-const ROAD_COLOR   = "#2a2a2a";
-const ROAD_EDGE    = "#ffcc00";
-const STRIPE_WHITE = "#ffffff";
-const GRASS_LIGHT  = "#1a6b10";
-const GRASS_DARK   = "#145a0c";
-const SHOULDER_RED = "#cc2222";
-const SHOULDER_WHT = "#dddddd";
+// ── Colors & Climate ──
+let SKY_TOP      = "#0b0e2a";
+let SKY_BOTTOM   = "#1a1040";
+let ROAD_COLOR   = "#2a2a2a";
+let ROAD_EDGE    = "#ffcc00";
+let STRIPE_WHITE = "#ffffff";
+let GRASS_LIGHT  = "#1a6b10";
+let GRASS_DARK   = "#145a0c";
+let SHOULDER_RED = "#cc2222";
+let SHOULDER_WHT = "#dddddd";
+
+let MOUNTAIN_TINT = "rgba(0,0,0,0)";
+let TREE_L_MULT = 1.0;
+let SUN_Y = 1.2;
+let MOON_Y = 0.15;
+let STAR_ALPHA = 1.0;
+
+const CLIMATE_STATES = [
+  // 0: Morning
+  {
+    skyTop: [57, 72, 108], skyBot: [230, 141, 94],
+    road: [50, 45, 45], edge: [255, 204, 0], stripe: [255, 240, 230],
+    grassL: [30, 110, 30], grassD: [20, 90, 20],
+    shRed: [204, 34, 34], shWht: [221, 200, 190],
+    sunY: 0.20, moonY: 1.2, starAlpha: 0.1, treeL: 0.7,
+    mTnt: [255, 100, 50, 0.3]
+  },
+  // 1: Day
+  {
+    skyTop: [78, 168, 222], skyBot: [144, 224, 239],
+    road: [60, 60, 60], edge: [255, 220, 0], stripe: [255, 255, 255],
+    grassL: [40, 150, 40], grassD: [25, 120, 25],
+    shRed: [220, 40, 40], shWht: [240, 240, 240],
+    sunY: 0.05, moonY: 1.2, starAlpha: 0.0, treeL: 1.0,
+    mTnt: [0, 0, 0, 0]
+  },
+  // 2: Sunset
+  {
+    skyTop: [58, 12, 163], skyBot: [247, 37, 133],
+    road: [40, 30, 40], edge: [255, 150, 0], stripe: [255, 200, 200],
+    grassL: [35, 90, 35], grassD: [25, 70, 25],
+    shRed: [180, 20, 50], shWht: [200, 150, 150],
+    sunY: 0.25, moonY: 1.2, starAlpha: 0.3, treeL: 0.6,
+    mTnt: [200, 0, 100, 0.4]
+  },
+  // 3: Night
+  {
+    skyTop: [11, 14, 42], skyBot: [26, 16, 64],
+    road: [20, 20, 25], edge: [150, 100, 0], stripe: [100, 100, 120],
+    grassL: [15, 50, 20], grassD: [10, 40, 15],
+    shRed: [100, 10, 10], shWht: [100, 100, 110],
+    sunY: 1.2, moonY: 0.15, starAlpha: 1.0, treeL: 0.3,
+    mTnt: [0, 0, 50, 0.6]
+  }
+];
+
+function lerpColor(c1, c2, t) {
+  return [
+    Math.round(c1[0] + (c2[0] - c1[0]) * t),
+    Math.round(c1[1] + (c2[1] - c1[1]) * t),
+    Math.round(c1[2] + (c2[2] - c1[2]) * t)
+  ];
+}
+function toRGB(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
+function toRGBA(c) { return `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`; }
+
+function updateClimate() {
+  const cycleLen = 15000;
+  let phase = ((distance + 3750) % cycleLen) / cycleLen; // Starts near Morning
+  if (state === "MENU") phase = ((gameTime*100 + 3750) % cycleLen) / cycleLen;
+  
+  const stateCount = CLIMATE_STATES.length;
+  const idx1 = Math.floor(phase * stateCount);
+  const idx2 = (idx1 + 1) % stateCount;
+  const t = (phase * stateCount) - idx1;
+  const s1 = CLIMATE_STATES[idx1];
+  const s2 = CLIMATE_STATES[idx2];
+  
+  SKY_TOP = toRGB(lerpColor(s1.skyTop, s2.skyTop, t));
+  SKY_BOTTOM = toRGB(lerpColor(s1.skyBot, s2.skyBot, t));
+  ROAD_COLOR = toRGB(lerpColor(s1.road, s2.road, t));
+  ROAD_EDGE = toRGB(lerpColor(s1.edge, s2.edge, t));
+  STRIPE_WHITE = toRGB(lerpColor(s1.stripe, s2.stripe, t));
+  GRASS_LIGHT = toRGB(lerpColor(s1.grassL, s2.grassL, t));
+  GRASS_DARK = toRGB(lerpColor(s1.grassD, s2.grassD, t));
+  SHOULDER_RED = toRGB(lerpColor(s1.shRed, s2.shRed, t));
+  SHOULDER_WHT = toRGB(lerpColor(s1.shWht, s2.shWht, t));
+  
+  SUN_Y = s1.sunY + (s2.sunY - s1.sunY) * t;
+  MOON_Y = s1.moonY + (s2.moonY - s1.moonY) * t;
+  STAR_ALPHA = s1.starAlpha + (s2.starAlpha - s1.starAlpha) * t;
+  TREE_L_MULT = s1.treeL + (s2.treeL - s1.treeL) * t;
+  
+  const mTnt = [
+    s1.mTnt[0] + (s2.mTnt[0] - s1.mTnt[0]) * t,
+    s1.mTnt[1] + (s2.mTnt[1] - s1.mTnt[1]) * t,
+    s1.mTnt[2] + (s2.mTnt[2] - s1.mTnt[2]) * t,
+    s1.mTnt[3] + (s2.mTnt[3] - s1.mTnt[3]) * t,
+  ];
+  MOUNTAIN_TINT = toRGBA(mTnt);
+}
 
 const CAR_COLORS = ["#ff3333","#3399ff","#ffcc00","#33cc66","#ff66cc","#ff8800","#aa44ff"];
 const TRUCK_COLORS = ["#6b4c2a","#555555","#336699","#994422"];
@@ -407,6 +498,7 @@ function updateParticles(dt) {
 // ── Drawing ───────────────────────────────────────────────────────
 
 function draw() {
+  updateClimate();
   ctx.save();
 
   // Screen shake
@@ -443,29 +535,49 @@ function drawSky() {
   ctx.fillRect(0, 0, W, HORIZON_Y * H);
 
   // Stars
-  for (const s of starField) {
-    const twinkle = 0.5 + 0.5 * Math.sin(gameTime * 3 + s.b * 10);
-    ctx.globalAlpha = twinkle * 0.8;
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(s.x * W, s.y * H, s.s * scale, 0, Math.PI * 2);
-    ctx.fill();
+  if (STAR_ALPHA > 0.01) {
+    for (const s of starField) {
+      const twinkle = 0.5 + 0.5 * Math.sin(gameTime * 3 + s.b * 10);
+      ctx.globalAlpha = twinkle * STAR_ALPHA;
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.s * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
 
   // Moon
-  const moonX = W * 0.78;
-  const moonY = H * 0.12;
-  const moonR = 25 * scale;
-  const moonGrad = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonR * 2);
-  moonGrad.addColorStop(0, "rgba(255,255,220,0.3)");
-  moonGrad.addColorStop(1, "rgba(255,255,220,0)");
-  ctx.fillStyle = moonGrad;
-  ctx.fillRect(moonX - moonR * 2, moonY - moonR * 2, moonR * 4, moonR * 4);
-  ctx.fillStyle = "#fffff0";
-  ctx.beginPath();
-  ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
-  ctx.fill();
+  if (MOON_Y < 1.0) {
+    const moonX = W * 0.78;
+    const moonY = H * MOON_Y;
+    const moonR = 25 * scale;
+    const moonGrad = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonR * 2);
+    moonGrad.addColorStop(0, "rgba(255,255,220,0.3)");
+    moonGrad.addColorStop(1, "rgba(255,255,220,0)");
+    ctx.fillStyle = moonGrad;
+    ctx.fillRect(moonX - moonR * 2, moonY - moonR * 2, moonR * 4, moonR * 4);
+    ctx.fillStyle = "#fffff0";
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Sun
+  if (SUN_Y < 1.0) {
+    const sunX = W * 0.22;
+    const sunY = H * SUN_Y;
+    const sunR = 35 * scale;
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3);
+    sunGrad.addColorStop(0, "rgba(255,220,100,0.4)");
+    sunGrad.addColorStop(1, "rgba(255,220,100,0)");
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(sunX - sunR * 3, sunY - sunR * 3, sunR * 6, sunR * 6);
+    ctx.fillStyle = "#ffdd55";
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 // ── Mountains ──
@@ -481,6 +593,8 @@ function drawMountains() {
     ctx.lineTo(mx, baseY - mh);
     ctx.lineTo(mx + mw, baseY);
     ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = MOUNTAIN_TINT;
     ctx.fill();
   }
 
@@ -580,7 +694,7 @@ function drawTrees() {
     ctx.fillRect(treeX - trunkW/2, y - treeH, trunkW, treeH * 0.4);
 
     // Canopy
-    ctx.fillStyle = `hsl(${t.hue}, 50%, ${15 + z * 10}%)`;
+    ctx.fillStyle = `hsl(${t.hue}, 50%, ${(15 + z * 10) * TREE_L_MULT}%)`;
     ctx.beginPath();
     ctx.arc(treeX, y - treeH * 0.75, treeH * 0.35, 0, Math.PI * 2);
     ctx.fill();
